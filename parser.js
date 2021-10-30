@@ -224,9 +224,17 @@ exports.OSCParser = class {
     return result;
   }
   
-  emptyBundle() {
+  /**
+   * Utility to create a bundle object.
+   * @param time (optional) an array with timestamp
+   * @return a new bundle
+   */
+  emptyBundle(time) {
+    if (time === undefined)
+      time = [0,1];
+      
     return {
-        timeTag: {raw: [0,1], native: Number},
+        timeTag: {raw: time, native: Number},
         packets: []
       }
   }
