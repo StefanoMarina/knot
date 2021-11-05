@@ -1,75 +1,210 @@
 # JSON and OSC Syntax
 
-Every bind file should be inside a JSON object:
-``
-{
-  .. stuff ..
-}
+## Welcome to JSON
+
+JSON is a really simply human readable syntax. Simple tutorial and
+explanations can be found [here](https://www.tutorialspoint.com/json/index.htm)  
+or [here](https://www.w3schools.com/js/js_json_intro.asp).
+
+You need to grasp only the basics, such as arrays (\[ \]) and objects "\{\}".
+
+Every property key should be lower case.
+
+## A binding file
+
+A binding file is a .json file with all the binds defined in it.
+
+Since a binding is an array, every binding must be inside brackets:
+
+```
+[
+  ... stuff ...
+]
 ``
 
-This root object supports up to 17 different keys: a MIDI channel number or the special channel "all".
+### Channel binding
+
+Bindings are defined by channel first. A special *all* channel (lowercase!)
+can be defined to create bindings. 
+
+```
+[
+  "1" : []
+]
+``
+This is creating a binding for channel 1.
+
+```
+[
+  "all" : [],
+  "1" : []
+]
+``
+
+This will create two bind lists: one for all channels, and one specific
+to channel 1.
+
+Note that *all* channel binds are formulated as 16 different binds.
+
+
+### Binding types
+
+You can bind either a key or a CC to a binding.
+
+There are 3 tipes of bindings: 
+- **Triggers** will generate the osc command when CC value/note velocity is met exactly;
+- **Faders** will generate the osc command while appending the CC/velocity value;
+- **Selectors** are similar to triggers but they have multiple values/velocity to be bound.
+
+
+Every bind file should be inside a JSON object. Binding type is defined as such:
 
 ``
-{
-  "all" :[ <-- channels are arrays, so use [] not {}
-    .. stuff that I want all channels to respond ..
-  ], <-- mind the comma after each object/array!
-  "1" : [
-    .. only on channel 1 messages ..
+[
+  "all" :[
+    {
+      "type": "trigger"
+    },
+    {
+      "type": "trigger"
+    }
   ],
-  "16" : [
-    .. only on channel 16 messages
+  "1" : [
+      "type" : "fader"
   ]
-}
+]
 ``
-There are basically two types of OSC commands: buttons (triggers) and faders.
-They both can be bound to a CC or  note velocity. 
 
-## Buttons and Faders
-**Buttons** will do something when the CC is **exactly** the *trigger* value:
+**Note**: type can be omitted. each of the 3 types requires a specific parameter
+that will suggest Knot what type of bind you want:
+- **Triggers** require the *trigger* property:
+- **Faders** require the *fader* property;
+- **Switches** require the *switch* property. Seeing a pattern here?
+
+#### Defining MIDI event
+
+As of 0.1 two events are supported: CC and noteon. CC are filtered by their
+value, while noteon can be filtered by note pitch (data1) and velocity (data2).
 
 ``
-{
-  "CC" : 100,
-  "trigger : 64,
-  "osc" :  "/panic"
-}
+[
+  "all" :[
+    {
+      "type": "trigger",
+      "cc" : 15
+    },
+    {
+      "type": "trigger",
+      "note": 69
+    }
+  ],
+  "1" : [
+      "type" : "fader"
+  ]
+]
 ``
-This will send the /panic osc message when a CC message when a CC 100 change message is sent
-with 64 as the new value. If *trigger* is not specified, 0 is assumed (any event).
 
-You may also use a key instead of a CC:
+We now have two binds: CC 15 and A5 (noteon 69) on all channels. This is
+actually 32 binds, 1 for each channel.
+
 ``
-{
-  "note" : 69,
-  "osc" : "/panic"
-}
+[
+  "all" :[
+    {
+      "type": "trigger",
+      "cc" : 15
+    },
+    {
+      "type": "trigger",
+      "note": 69
+    }
+  ],
+  "1" : [
+      "type" : "fader"
+  ]
+]
 ``
-This will trigger a ``/panic`` osc message if A5 is pressed. if *trigger* is specified, velocity will be evalutated.
 
-This can be useful in some scenario, i.e. a keyboard with no velocity that you want to turn into a CC.
+#### Triggers
+Triggers require the *trigger* property, which defines the CC value or the
+velocity to be met. a trigger value of 0 means "any message". You can omit
+trigger to be automatically set on 0.
 
-**Faders** will send OSC messages by adding or converting *CC* or *note* to a value. The special parameter *fader* is used, with 
-the following values:
+``
+[
+  "all" :[
+    {
+      "type": "trigger",
+      "cc" : 15,
+      "trigger" : 127
+    },
+    {
+      "type": "trigger",
+      "note": 69
+    }
+  ],
+  "1" : [
+      "type" : "fader"
+  ]
+]
+``
+
+Now the first bind triggers only when CC 15 is 127. Trigger two, on the
+other hand, will trigger everytime A5 is pressed, no matter the velocity.
+
+#### Faders
+Faders can bind midi to osc in the same way triggers do, however they pass
+a continuous value as the final OSC parameter. Supported *fader* modes are:
 
 - *abs* : no conversion, value will be 1-127;
 - *int* : integer, values will be converted to "min" and "max";
 - *float* : float, values will be converted to "min" and "max";
 - *bool* : this requires *max* only. If value is >= max, "T" will be send. if value is < max, "F" will be send.
 
+When you do a conversion, you need two additional parameters: min and max. they define
+the boundaries of the scale. They are not required for abs and abs-.
+
 Each one of those modes has a **reverse mode**: the byte will be reversed by doing 127-byte value. The reverse mode is indicated
 by the minus sign "-" after the mode. So,"abs-" will reverse the value and handle it directly, "bool-" will revert the value before cheking if it
 is more than max, etc.
 
 ``
+[
+  "all" :[
+    {
+      "type": "trigger",
+      "cc" : 15,
+      "trigger" : 127
+    },
+    {
+      "type": "trigger",
+      "note": 69
+    }
+  ],
+  "1" : [
+      "type" : "fader",
+      "cc" : 16,
+      "fader" : "abs",
+      "min" : "1",
+      "max" : "64"
+  ]
+]
+``
+
+This will capture any CC 16 event, reduce the value from 1-127 (original midi)
+to 1-64 (min and max) and send it. It will halve the original value.
+ 
+Here is another example.
+
+``
 {
-  "CC": 100,
+  "cc": 100,
   "fader": "float",
   "min": -1,
   "max": 1
-  "osc": "/oscillator"
 }
 ``
+
 This will turn any CC value from CC 100 to a -1 / 1 value, and then the value is attached to the osc message.
 
 ``
@@ -83,13 +218,14 @@ This will turn any CC value from CC 100 to a -1 / 1 value, and then the value is
 Playing a A5 stronger than velocity 90 will enable distorsion ```/distorion T```, 
       while playing less than 90 will disable it ```/distortion F```.
 
-## Selectors
-A **Selector** is a special group of triggers bound on the same CC/Note.
+#### Switches
+A **Switch** is a special group of triggers bound on the same CC/Note.
 
 ``
 {
-  "CC" : 100
-  "selector" : {
+  "type" : "switch",
+  "CC" : 100,
+  "switch" : {
     "0" : "/mode 'poly'",
     "64": "/mode 'legato'",
     "127": "/mode 'mono'"
@@ -104,7 +240,21 @@ Make sure you give enough room between each trigger and use arbitrary values
 such as 0,32 (25%), 64 (50%), 98 (75%) or 127 (100%). Since the value needs to be **exact**,
 a value of 63 will **not** trigger the osc command bound on 64.
 
-## Manipulating syntax
+### OSC 
+
+The "osc" property defines the osc to be triggered.
+
+``
+{
+  "cc" :100,
+  "fader": abs-,
+  "osc": "/filter/cutoff"
+}
+``
+
+This will send a reversed value from cc 100 to /filter/cutoff. If i receive
+a value of 32 from cc 100, the final message will be ``/filter/cutoff 95``
+(127-32).
 
 if you need to put your fader score somewhere which is not the last parameter, mark it with a '%' sign.
 
@@ -116,9 +266,9 @@ if you need to put your fader score somewhere which is not the last parameter, m
 }
 ``
 
-this will put a reverse mode of absolute (so 127-value) as the first parameter of the ``/filter/cutoff`` line.
+this will put the value as the first parameter of the ``/filter/cutoff`` line instead of appending it.
 
-### Bundles
+#### Bundles
 
 Sometimes you want to send multiple messages instead of a single one. This is really simple to do, just
 use an array instead of a string:
@@ -131,7 +281,7 @@ use an array instead of a string:
 }
 ``
 
-This will, in order, trigger /panic and /load_file when CC 100 reaches 64 or more.
+This will, in order, trigger /panic and /load_file when CC 100 reaches 64.
 
 ### Shell commands
 
@@ -157,6 +307,7 @@ shell commands, write them inside a script, and launch the script via the *comma
 For an extensive reading on OSC syntax, [try here](http://wosclib.sourceforge.net/doc/_w_osc_lib_osc__spec__page.html).
 
 Syntax support is pretty much depending on your software/device of choice. Knot just mindlessly sends data.
+We will cover only knot's custom parsing requirements here.
 
 All parameters must stay in the same line:
 
@@ -168,7 +319,10 @@ All parameters must stay in the same line:
 "
 ``
 
-And must be separated by a space.
+And must be separated by a space ``/path 'this is ok' 3 1.5 T`` is ok,
+``/path 'this is not'31.5T`` is not.
+
+to force floats, always add a . to a number, i.e. 1.0.
 
 ### Strings and Blobs
 
