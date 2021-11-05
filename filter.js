@@ -32,14 +32,17 @@ var exports = module.exports = {};
  * handling should be considering this.
  */
 exports.Filter = class {
+  
   /**
    * Filter constructor
-   * channel must be "all" or a number between 1 and 16.
-   * config is an object built from json configuration.
+   * @param channel must be "all" or a number between 1 and 16.
+   * @param bind is an object built from json configuration or null for an empty filter.
    */
-  constructor(channel, configuration) {
+  constructor(channel, bind) {
+    this.bind = bind;
+    this.status = [];
     
-    this.config = configuration;
+    if (bind == null) return;
     
     if (isNaN(channel))
       this.channel = "all";
@@ -47,15 +50,15 @@ exports.Filter = class {
       this.channel = channel;
     
     // Status byte - this is where channel matters
-    this.status = [];
+    
     let bStatus = 0;
       
-    if (undefined !== this.config.cc) {
+    if (undefined !== this.bind.cc) {
       bStatus = 176;
-      this.data1 = Number(configuration.cc);
-    } else if (undefined !== this.config.note) {
+      this.data1 = Number(bind.cc);
+    } else if (undefined !== this.bind.note) {
       bStatus = 144;
-      this.data1 = Number(configuration.note);
+      this.data1 = Number(bind.note);
     } else
       throw "Filter has no cc or noteon event";
     
@@ -68,23 +71,24 @@ exports.Filter = class {
     // data1 byte - this is used for cc / note number
     
     // data2 byte - this will be filtered if a fader is used instead of a trigger.
-    if (undefined !== this.config.trigger) {
-      this.cutoff = this.config.trigger;
-      this.mode = "trigger";
-    } else if (undefined !== this.config.fader) {  
+    if (undefined !== this.bind.trigger) {
+      this.cutoff = this.bind.trigger;
+      this.type = "trigger";
+    } else if (undefined !== this.bind.fader) {  
       this.cutoff = 0;
-      this.mode = this.config.fader;
-    } else if (undefined !== this.config.selector) {
-      this.mode = "selector";
+      this.type = this.bind.fader;
+    } else if (undefined !== this.bind.switch) {
+      this.type = "switch";
+      this.events = this.bind.switch;
     }
     
-    if (configuration.osc !== undefined) {
-      this.outcome = { "type" : "osc" , "path" : configuration.osc };
-    } else { 
-      this.outcome = { "type" : "command" , "path" : this.config.command };
+    if (this.type != "switch") {
+      if (bind.osc !== undefined) {
+        this.outcome = { "type" : "osc" , "path" : bind.osc };
+      } else { 
+        this.outcome = { "type" : "command" , "path" : bind.command };
+      }
     }
-    
-    this.replaceMode = this.outcome.path.indexOf(" % ") !== -1;
   }
   
   /**
@@ -94,12 +98,12 @@ exports.Filter = class {
   accepts(midiMessage) {
     return (this.status.indexOf(midiMessage[0]) >= 0 
               && (this.data1 == midiMessage[1])
-              && ( (this.mode == "trigger")
+              && ( (this.type == "trigger")
                     ? (midiMessage[2] == this.cutoff)
                     : true
                  )
-              && ( (this.mode == "selector") 
-                    ? this.selector.events.indexOf(midiMessage[2])>=0
+              && ( (this.type == "switch")
+                    ? this.events[midiMessage[2]] !== undefined
                     : true
                  )
             );
@@ -111,50 +115,46 @@ exports.Filter = class {
    * @return the outcome
    */
   process(midiMessage) {
-    var score = (this.mode.match(/-/gi)!==null) 
-                 ? 127 - midiMessage[2]
-                 : midiMessage[2];
+    var score = midiMessage[2], revScore = 127 - midiMessage[2];
     
-    switch (this.mode) {
+    switch (this.type) {
       case "trigger": return this.outcome;
-      case "selector": 
-        let index = this.selector.events.indexOf(score);
-        if (index == -1)
-          throw `Filter::process: cannot force score ${score} on selector`;
-        return this.selector.triggers[index];
-      break;
-      case "abs-": case "abs" : break;
-      case "int-": case "int":
+      case "switch": 
+        return {type: "osc", path: this.events[score]};
+      case "abs" : break;
+      case "int":
         score = Math.floor (
-              (score/127)*(this.config.max-this.config.min)+this.config.min
+              (score/127)*(this.bind.max-this.bind.min)+this.bind.min
             );
       break;
-      case "float-": case "float":
+      case "float":
       score = Math.round (
-              ((score/127)*(this.config.max-this.config.min)+this.config.min)
+              ((score/127)*(this.bind.max-this.bind.min)+this.bind.min)
             *10) / 10;
       break;
-      case "bool-" : case "bool":
+      case "bool":
         score = (score >= this.max) ? "T" : "F";
       break;
       default:
-        throw `undefined mode ${this.mode}`;
+        throw `undefined mode ${this.type}`;
     }
     
-    // faders osc path addition
+    // faders need to update osc path
     var result = { "type" : this.outcome.type};
     
     if (Array.isArray(this.outcome.path)) {
       result.path = [];
       for (let i = 0; i < this.outcome.path.length; i++) {
-        result.path[i] = (this.replaceMode)
-                  ? this.outcome.path.replace(/ \%/gi, score)
+        result.path[i] = (this.outcome.path[i].match(/ -?%/g))
+                  ? this.outcome.path[i].replace(/ -%/gi,` ${revScore}`)
+                    .replace(/ \%/gi,` ${score}`)
                   : `${this.outcome.path[i]} ${score}`;
       }
-    } else {    
-      result.path = (this.replaceMode)
-                    ? this.outcome.path.replace(/ \%/gi, score)
-                    : `${this.outcome.path} ${score}`;
+    } else { 
+      result.path = (this.outcome.path.match(/ -?%/g))
+                  ? this.outcome.path.replace(/ -%/gi, ` ${revScore}`)
+                    .replace(/ \%/gi, ` ${score}`)
+                  : `${this.outcome.path} ${score}`;
     }
     return result;
   }
@@ -173,8 +173,10 @@ exports.Filter = class {
                   );
     
     //osc or shell required
-    if (undefined === result.osc && undefined === result.command)
-      throw "missing osc or shell parameter";
+    if (undefined === result.osc && undefined === result.command
+          && undefined === result["switch"])
+      throw "missing osc or shell parameter in non-switch";
+      
     if (undefined === result.cc && undefined === result.note)
       throw "missing cc or note event";
     
@@ -185,8 +187,8 @@ exports.Filter = class {
       
     if (undefined === entry.trigger &&
             undefined === entry.fader && 
-                undefined === entry.selector)
-      throw "missing trigger, fader or selector";
+                undefined === entry.switch)
+      throw "missing trigger, fader or switch";
     
     if (result.fader !== undefined) {
       result.fader = result.fader.toLowerCase();
@@ -205,15 +207,6 @@ exports.Filter = class {
         throw "unrecognized fader " + result.fader;
     } else if (undefined !== entry.trigger){
       result.trigger = Number(entry.trigger);
-    } else {
-      //optimization of selector syntax in 2 arrays
-      result.selector = {"triggers" : [], "events": []};
-      
-      result.selectorEvents = [];
-      for (trigger in entry.selector) {
-        result.selector.triggers.push(Number(trigger));
-        result.selector.events.push(entry.selector[trigger]);
-      }
     }
     
     return result;
@@ -233,16 +226,21 @@ exports.Filter = class {
  */
 
 exports.FilterMap = class {
+
   /**
    * @param configuration should be an object wrote under the SYNTAX.md json syntax.
+   * if null, an empty filter is created.
    * @param disableShell (default: false) will remove any filter with a shell command.
    */
   constructor(configuration, disableShell) {
-    var channels = Object.keys(configuration);
-    this.filterMap = [];
+    this.filterMap = {};
     
     if (undefined === disableShell) disableShell = false;
+    this.shellDisabled = disableShell;
     
+    if (configuration == null) return;
+      var channels = Object.keys(configuration);
+      
     var filterArray;
     var filter;
     var stString, d1String;
@@ -265,8 +263,11 @@ exports.FilterMap = class {
           
            filter.status.forEach( (status) => {
               if (undefined === this.filterMap[status])
-                this.filterMap[status] = [];
-              this.filterMap[status][filter.data1] = filter;
+                this.filterMap[status] = {};
+              if (this.filterMap[status][filter.data1] === undefined) {
+                this.filterMap[status][filter.data1] = [];
+              }
+              this.filterMap[status][filter.data1].push(filter);
             });
     
       }, this);
@@ -282,23 +283,42 @@ exports.FilterMap = class {
   
   /**
    * process a midi message
-   * @return an object with { "type" , "path" } or false if no filter present
+   * @param midiMessage a midi message in [Status, D1, D2] format
+   * @return an array of filtered results with { "type" , "path" } or false if no filter present
    */
    process(midiMessage) {
-     if (this.lastFilter !== undefined) {
-       if (this.lastFilter.accepts(midiMessage))
-        return this.lastFilter.process(midiMessage);
+     
+     let filterList = null;
+     
+     if (this.lastFilter != null && this.lastFilter.length > 0
+            && (this.lastFilter[0].accepts(midiMessage))) {
+        filterList = this.lastFilter;
+      } else
+        this.lastFilter = null;
+            
+     if (filterList == null) {
+       if (undefined === this.filterMap[midiMessage[0]])
+        return false;
+       if (undefined === this.filterMap[midiMessage[0]][midiMessage[1]])
+        return false;
+     }     
+     
+     filterList = this.filterMap[midiMessage[0]][midiMessage[1]];
+     
+     let filter = null;
+     let outcome = null;
+     let result = [];
+     
+     for (let i = 0; i < filterList.length; i++) {
+         filter = this.filterMap[midiMessage[0]][midiMessage[1]][i];
+         if (filter.accepts(midiMessage)){
+           console.log("Accepted with filter " + filter.type);
+           this.lastFilter = filterList;
+           result.push(filter.process(midiMessage));
+         }
      }
      
-     if (undefined === this.filterMap[midiMessage[0]])
-      return false;
-     if (undefined === this.filterMap[midiMessage[0]][midiMessage[1]])
-      return false;
-     if (this.filterMap[midiMessage[0]][midiMessage[1]].accepts(midiMessage) ) {
-        this.lastFilter = this.filterMap[midiMessage[0]][midiMessage[1]];
-        return this.lastFilter.process(midiMessage);
-      } else
-      return false;
+     return (!result.length) ? false : result;
    }   
    
    /**
@@ -307,43 +327,58 @@ exports.FilterMap = class {
    toString() {
      var result = {};
      
-     for (let i = 0; i < this.filterMap.length; i++) {
-       if (this.filterMap[i] == null)
-        continue;
+     let status = 0;
+     let channel = 0;
+     let nKey = "";
+     let type = "";
+     
+     for (let key in this.filterMap) {
+        status = (key >> 4);
+        channel = (key & 0xf);
+        type = (status == 11) ? "CC" : "note";
         
-       var status = i;
-       var filterArray = this.filterMap[i];
-       
-       for (let j = 0; j < filterArray.length; j++) {
-         if (filterArray[j] == null)
-           continue;
-         result[`S${status}D${j}`] = filterArray[j];
-       }
+        
+        
+        for (let subKey in this.filterMap[key]) {
+          nKey =`CH${channel}${type}${subKey}`;  
+          result[nKey] = JSON.stringify(this.filterMap[key][subKey]);
+        }
      }
      
      return result;
    }
+   
    /**
     * Merges two filters, according to the rules specified by the method parameter
     * @param source source filtermap
     * @param additional additional filtermap
-    * @param preserve if true, preserve source's status byte bindings over additional
-    * bindings. preserve is estabilished through status/data1 comparison
-    *             "overwrite" to remove source's params
-    * @return modified source
+    * @param preserve if true, source's filters will not be removed when they
+    * match with preserve
+    * @return new object. Note that any actual filter is referenced and not cloned
+    * into the new object.
     */
     static merge(source, additional, preserve) {
       if (preserve === undefined)
         preserve = false;
       
-      for (let i = 0; i < additional.length; i++) {
-        if (additional[i] == null)
-          continue;
+      //deep clone of source
+      let newFilterMap = new exports.FilterMap(null, source.disableShell);
+      
+      for (let sb in additional) {
+        
+        if (source[sb] !== undefined) {
+          newFilterMap[sb] = {};
           
-        if (source[i] == null || !preserve)
-          source[i] = additional[i];
+          for (let d1 in additional[sb]) {
+            newFilterMap[sb][d1] = (source[sb][d1] !== undefined && preserve)
+                ? newFilterMap[sb][d1].concat(additional[sb][d1])
+                : additional[sb][d1];
+          }
+          
+        } else
+          newFilterMap[sb] = additional[sb];
       }
       
-      return source;
+      return newFilterMap;
     }
 }
