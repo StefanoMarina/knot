@@ -33,6 +33,7 @@ exports.Knot = class {
   
   constructor(oscPort) {
       this.osc = oscPort;
+      this.parser = new OSCParser.OSCParser();
   }
 
   /**
@@ -45,8 +46,8 @@ exports.Knot = class {
    * Parse a configuration file and creates the FilterMap object.
    * @param configuration string with a path to a .json file or FilterMap object. This can also be a mixed array,
    * in which case every filter is loaded.
-   * @param preserve  (optional) if configuration is a FilterMap, this determine
-   * the merge mode. Default is false - new binds will override the old ones.
+   * @param preserve  (optional) (default=false) if true, the new configuration will be overimposed without
+   * overwriting conflicting bindings with the current filtermap.
    * @param disableShell (default=false) any filterMap will disregard filters with shell commands.
    * @throws error on loading, parsing or sanitizing
    */
@@ -82,9 +83,6 @@ exports.Knot = class {
         }
       }
     }, this);
-    
-    if (this.parser === undefined)
-      this.parser = new OSCParser.OSCParser();
   }
   
   /**
@@ -95,7 +93,6 @@ exports.Knot = class {
   setMidi(request) {
     if (this.midi !== undefined) {
       this.midi.closePort();
-      this.midi.release(); //seems useful for avoiding ALSA resource problem
       this.midi = undefined;
     }
     
@@ -124,6 +121,7 @@ exports.Knot = class {
         throw `Cannot find device id for request ${request}`;
       
       try {
+        this.midi.ignoreTypes(false, false, false);
         this.midi.openPort(this.deviceID);
       } catch (err) {
         throw `Cannot open midi port ${deviceID}: ${err}`;
@@ -140,31 +138,49 @@ exports.Knot = class {
   
   getMidi() {return this.midi;}
   
+  /**
+   * Sets a Output for any midi message that is not intercepted.
+   * @param midiOut a midi output
+   */
+  setMidiOut(midiOut) {
+    this.midiOut = midiOut;
+  }
+  
   midiCallback(delta, message)  {
    if (this.filterMap === undefined) {
-      console.log("warning: empty filter map.");
+      if (this.midiOut != null) {
+        console.log(`redirecting ${message}...`);
+        this.midiOut.sendMessage(message);
+      }
       return;
-    }
+   }
+    
     let outcome = this.filterMap.process(message);
     
-    console.log(`filtered ${JSON.stringify(message)} : ${JSON.stringify(outcome)}`);
+    //console.log(`filtered ${JSON.stringify(message)} : ${JSON.stringify(outcome)}`);
     
     if (outcome !== false && outcome!== undefined) {
-      switch (outcome.type) {
-        case "command" :
-          exec (outcome.path);
-        break;
-        case "osc":
-          if (this.osc === undefined)
-            return;
-          
-          try {  
-            this.osc.send(this.parser.translate(outcome.path));
-          } catch (err) {
-            console.log(`bad osc message for ${outcome.path}: ${err}`);
-          }
-        break;
+      let request = null;
+      for (let i = 0; i < outcome.length; i++) {
+        request = outcome[i];
+        switch (request.type) {
+          case "command" :
+            exec (request.path);
+          break;
+          case "osc":
+            if (this.osc === undefined)
+              return;
+            
+            try {  
+              this.osc.send(this.parser.translate(request.path));
+            } catch (err) {
+              console.log(`bad osc message for ${request.path}: ${err}`);
+            }
+          break;
+        } 
       }
+    } else if (this.midiOut != null) {
+      this.midiOut.sendMessage(message);
     }
   }
   
