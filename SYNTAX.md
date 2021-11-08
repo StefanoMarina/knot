@@ -6,7 +6,7 @@ JSON is a really simply human readable syntax. Simple tutorial and
 explanations can be found [here](https://www.tutorialspoint.com/json/index.htm)  
 or [here](https://www.w3schools.com/js/js_json_intro.asp).
 
-You need to grasp only the basics, such as arrays (\[ \]) and objects "\{\}".
+You need to grasp only the basics, such as arrays (\[ \]) and objects "\{ \}".
 
 Every property key should be lower case.
 
@@ -162,11 +162,12 @@ a continuous value as the final OSC parameter. Supported *fader* modes are:
 - *bool* : this requires *max* only. If value is >= max, "T" will be send. if value is < max, "F" will be send.
 
 When you do a conversion, you need two additional parameters: min and max. they define
-the boundaries of the scale. They are not required for abs and abs-.
+the boundaries of the scale. They are not required for abs.
 
-Each one of those modes has a **reverse mode**: the byte will be reversed by doing 127-byte value. The reverse mode is indicated
-by the minus sign "-" after the mode. So,"abs-" will reverse the value and handle it directly, "bool-" will revert the value before cheking if it
-is more than max, etc.
+Since faders expect a value to be converted, the special word ``${val}`` should be put where
+you want your value to be converted. See _Advanced Syntax_ for more info. Writing ``${-val}`` will
+produce a conversion on a reversed value (value = 127 - value). If ``${val}`` is omitted, the Filter
+will automatically append it on a fader.
 
 ``
 [
@@ -256,13 +257,14 @@ This will send a reversed value from cc 100 to /filter/cutoff. If i receive
 a value of 32 from cc 100, the final message will be ``/filter/cutoff 95``
 (127-32).
 
-if you need to put your fader score somewhere which is not the last parameter, mark it with a '%' sign.
+if you need to put your fader score somewhere which is not the last parameter, put the special word
+``${val}``.
 
 ``
 {
   "cc" :100,
   "fader": abs-,
-  "osc": "/filter/cutoff % 3"
+  "osc": "/filter/cutoff ${val} 3"
 }
 ``
 
@@ -302,12 +304,42 @@ or just want to be safe, you can disable shell commands (see documentation).
 Also, bundles of commands are not supported. If you want to execute multiple
 shell commands, write them inside a script, and launch the script via the *command* property.
 
+### Special Syntax
+You can use some special variables to complete and parse your OSC syntax and make it
+more responsive to your midi Device.
+
+All keywords must be put inside dollar sign ($) and brackets {} such as ``${val}``.
+
+All keywords support the "-" sign, so ``${-ch}`` is 15-current channel.
+
+| Keyword | Meaning |
+|:------:|:--------:|
+| ${val}  | Value as specified by the fader |
+| ${ch}   | Channel as in 0-15 |
+| ${CH}   | Channel as in 1-16 |
+| ${sb}   | Status byte |
+| ${d1}   | Data 1 byte (CC, note  or MSB)|
+| ${d2}   | Data 2 byte (value, velocity or LSB )
+
+Let's say I want a certain osc path for volume, say ``/instrument0/volume``, 
+to be responsive to the CC channel. I want to do this on every channel, but I don't want to write 16 specific paths!
+
+I can write ``/instrument${ch}/volume``, so the path will automatically become
+``/istrument0/volume`` when played on channel 0, ``/istrument15/volume`` 
+when played on channel 15.
+
+
 ## OSC Syntax
 
 For an extensive reading on OSC syntax, [try here](http://wosclib.sourceforge.net/doc/_w_osc_lib_osc__spec__page.html).
 
 Syntax support is pretty much depending on your software/device of choice. Knot just mindlessly sends data.
 We will cover only knot's custom parsing requirements here.
+
+However, some special addition to the default syntax is specified here, to make osc paths
+more human-readable and suited for json.
+
+None of the following is a OSC convention.
 
 All parameters must stay in the same line:
 
