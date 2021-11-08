@@ -26,14 +26,16 @@ const MIDI = require('midi');
 const OSC = require ('osc');
 const OSCParser = require ('./parser.js');
 const {execSync, exec} = require("child_process");
+const EventEmitter = require('events');
 
 var exports = module.exports = {};
 
-exports.Knot = class {
+class Knot extends EventEmitter{
   
   constructor(oscPort) {
-      this.osc = oscPort;
-      this.parser = new OSCParser.OSCParser();
+    super();
+    this.osc = oscPort;
+    this.parser = new OSCParser.OSCParser();
   }
 
   /**
@@ -149,7 +151,8 @@ exports.Knot = class {
   midiCallback(delta, message)  {
    if (this.filterMap === undefined) {
       if (this.midiOut != null) {
-        console.log(`redirecting ${message}...`);
+        //console.log(`redirecting ${message}...`);
+        this.emit('midi', delta, message);
         this.midiOut.sendMessage(message);
       }
       return;
@@ -160,7 +163,11 @@ exports.Knot = class {
     //console.log(`filtered ${JSON.stringify(message)} : ${JSON.stringify(outcome)}`);
     
     if (outcome !== false && outcome!== undefined) {
+      
       let request = null;
+      
+      this.emit('filter', outcome, delta, message);
+      
       for (let i = 0; i < outcome.length; i++) {
         request = outcome[i];
         switch (request.type) {
@@ -168,8 +175,8 @@ exports.Knot = class {
             exec (request.path);
           break;
           case "osc":
-            if (this.osc === undefined)
-              return;
+            if (this.osc == null)
+              break;
             
             try {  
               this.osc.send(this.parser.translate(request.path));
@@ -180,9 +187,13 @@ exports.Knot = class {
         } 
       }
     } else if (this.midiOut != null) {
+      this.emit('midi', delta, message);
       this.midiOut.sendMessage(message);
-    }
+    } else
+      this.emit('midi', delta, message);
   }
   
   getOSC() {return this.osc;}
 }
+
+exports.Knot = Knot;

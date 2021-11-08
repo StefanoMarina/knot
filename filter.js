@@ -23,6 +23,8 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 var exports = module.exports = {};
 
+const Parsers = require ("./parser.js");
+
 /**
  * Filters are used to check if a midi message is required to be converted
  * to OSC or shell messages.
@@ -85,6 +87,18 @@ exports.Filter = class {
     if (this.type != "switch") {
       if (bind.osc !== undefined) {
         this.outcome = { "type" : "osc" , "path" : bind.osc };
+        
+        //faders requires ${val} to be present
+        if (this.type != "trigger") {
+          if (Array.isArray(this.outcome.path)){
+            this.outcome.path = bind.osc.map ( (item) =>{
+              return (!item.match(/\$\{val\}/g))
+                  ? item + " ${val}" : item;
+            });
+          } else if (!this.outcome.path.match(/${val}/g))
+            this.outcome.path = bind.osc + " ${val}";
+        }
+        
       } else { 
         this.outcome = { "type" : "command" , "path" : bind.command };
       }
@@ -142,19 +156,17 @@ exports.Filter = class {
     // faders need to update osc path
     var result = { "type" : this.outcome.type};
     
+    let parser = new Parsers.MIDIParser();
+    parser.setMidiMessage(midiMessage);
+    parser.setValue(score);
+    
     if (Array.isArray(this.outcome.path)) {
       result.path = [];
       for (let i = 0; i < this.outcome.path.length; i++) {
-        result.path[i] = (this.outcome.path[i].match(/ -?%/g))
-                  ? this.outcome.path[i].replace(/ -%/gi,` ${revScore}`)
-                    .replace(/ \%/gi,` ${score}`)
-                  : `${this.outcome.path[i]} ${score}`;
+        result.path[i] = parser.render(this.outcome.path[i]);
       }
-    } else { 
-      result.path = (this.outcome.path.match(/ -?%/g))
-                  ? this.outcome.path.replace(/ -%/gi, ` ${revScore}`)
-                    .replace(/ \%/gi, ` ${score}`)
-                  : `${this.outcome.path} ${score}`;
+    } else {
+      result.path = parser.render(this.outcome.path);
     }
     return result;
   }
@@ -239,8 +251,8 @@ exports.FilterMap = class {
     this.shellDisabled = disableShell;
     
     if (configuration == null) return;
-      var channels = Object.keys(configuration);
-      
+    
+    var channels = Object.keys(configuration);  
     var filterArray;
     var filter;
     var stString, d1String;
@@ -312,7 +324,6 @@ exports.FilterMap = class {
      for (let i = 0; i < filterList.length; i++) {
          filter = this.filterMap[midiMessage[0]][midiMessage[1]][i];
          if (filter.accepts(midiMessage)){
-           console.log("Accepted with filter " + filter.type);
            this.lastFilter = filterList;
            result.push(filter.process(midiMessage));
          }
@@ -336,8 +347,6 @@ exports.FilterMap = class {
         status = (key >> 4);
         channel = (key & 0xf);
         type = (status == 11) ? "CC" : "note";
-        
-        
         
         for (let subKey in this.filterMap[key]) {
           nKey =`CH${channel}${type}${subKey}`;  

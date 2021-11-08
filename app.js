@@ -30,12 +30,13 @@ const OSCParser = require ('./parser.js');
 const KNOT = require('./knot.js');
 
 function printHelp() {
-  console.log('node knot.js [device] [osc url or "null" ] [-pdl] [one or more config files]');
+  console.log('node knot.js [device] [osc url or "null" ] [-pdvl] [one or more config files]');
   console.log('device: may be a number or a string, knot will try to match (see -l)');
   console.log('osc: may be null or osc url (IP:port)');
   console.log('-p: preserve previous binds on conflict (default: false)');
   console.log('-d: disable shell commands (default: false)');
   console.log('-l: list midi devices');
+  console.log('-v: verbose mode');
 }
 
 const app = {"args" : process.argv.slice(2)};
@@ -82,10 +83,14 @@ if ("null" != address.toLowerCase()) {
 app.knot = new KNOT.Knot(app.osc);
 
 //Configuration
-let preserve = (app.args.indexOf("-p")>=0);
-let disable = (app.args.indexOf("-d")>=0);
+let parameters = app.args.filter( (item) => {return item.match(/^-\w+/)});
 
-let configs = app.args.slice(2+preserve);
+let preserve = (parameters.indexOf("-p")>=0);
+let disable = (parameters.indexOf("-d")>=0);
+let verbose = (parameters.indexOf("-v")>=0);
+
+let configs = app.args.splice(2,app.args.length).filter ((item)=>{return item.match(/^[^\-].*/);});
+
 try {
     app.knot.loadConfiguration(configs, preserve);
     if (app.knot.filterMap=== undefined
@@ -115,10 +120,16 @@ try {
   console.log("opened midi");
 } catch (err) {
   console.log(`error on opening midi device: ${err}`);
+  if (app.osc != null) app.osc.close();
 }
-/*
-app.knot.midi.on('message', (delta,msg) => {
-  console.log(`MIDI: (${delta}) - ${JSON.stringify(msg)}`);
-});
-*/
-console.log(JSON.stringify(app.knot.filterMap.toString(),null, 2));
+
+if (verbose >= 0) {
+  app.knot.on('midi', (delta,msg) => {
+    console.log(`MIDI: (${delta}) - ${JSON.stringify(msg)}`);
+  });
+  app.knot.on('filter', function (outcome, delta, msg) {
+    console.log(`Filtered ${JSON.stringify(msg)}: ${JSON.stringify(outcome)}`);
+  });
+  
+  console.log(app.knot.filterMap.toString());
+}

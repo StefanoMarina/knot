@@ -30,6 +30,10 @@ const SimpleTextParser = require ('simple-text-parser');
 
 var exports = module.exports = {};
 
+/**
+* OSC Parser
+* turns an osc path into an osc path object
+*/
 exports.OSCParser = class {
   constructor() {
     
@@ -239,3 +243,55 @@ exports.OSCParser = class {
       }
   }
 }
+
+class MIDIParser extends SimpleTextParser.Parser {
+  constructor() {
+    super();
+    this.midiMessage = null;
+    this.value = null;
+    
+    this.addRule(/\$\{(-)?([\w\d]+)\}/g, (full, minus, value) => {
+      
+      let result = null;
+      switch (value) {
+        case "ch":
+          result = (minus == null) ? (this.midiMessage[0] & 0xf)
+                 : 15-(this.midiMessage[0] & 0xf);
+        break;
+        case "CH":
+          result = (minus == null) ? (this.midiMessage[0] & 0xf)+1
+                 : (15-(this.midiMessage[0] & 0xf))+1;
+        break;
+        case "sb": 
+          result = (minus == null) ? this.midiMessage[0]
+                 : 127 - this.midiMessage[0];
+        break;
+        case "d1" : 
+          result = (minus == null) ? this.midiMessage[1]
+                 : 127 - this.midiMessage[1];
+        break;
+        case "d2": 
+          result = (minus == null) ? this.midiMessage[2]
+                 : 127 - this.midiMessage[2];
+        break;
+        case "val": 
+          result = (minus == null) ? this.value
+                    : 127 - this.value;
+        break;
+        default: throw "Undefined midi message '" + value+"'";
+      }
+      
+      return String(result);
+    });
+  }
+  
+  setMidiMessage(message) {
+    this.midiMessage = message;
+  }
+  
+  setValue(value) {
+    this.value = value;
+  }
+}
+
+exports.MIDIParser = MIDIParser;
