@@ -15,7 +15,7 @@
   "dependencies": {
     "body-parser": "^1.19",
     "node-gyp": "^8.3",
-    "midi": "^1",
+    "midi": "^2",
     "osc": "^2.4",
     "simple-text-parser": "~2",
     "util": ">=0",
