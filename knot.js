@@ -36,8 +36,23 @@ class Knot extends EventEmitter{
     super();
     this.osc = oscPort;
     this.parser = new OSCParser.OSCParser();
+    this.emitOnly = false;
   }
 
+  
+  
+  /**
+   * sets "emit only" mode. In emit only mode, osc is never send and
+   * commands are never executed, only events are triggered. this is
+   * useful if you want to use Knot as a "dispatcher" rather than a
+   * standalone app.
+   * @param value sets the emit only mode
+   * @return the current emit only mode (before changing)
+   */
+  setEmitOnly(value) {
+    this.emitOnly = value;
+  }
+   
   /**
    * sets filterMap to null. this must be called if the old configuration
    * is to be discarded entirely.
@@ -172,28 +187,38 @@ class Knot extends EventEmitter{
         request = outcome[i];
         switch (request.type) {
           case "command" :
-            exec (request.path);
+            this.emit('command', request.path, delta, message);
+            if (!this.emitOnly) exec (request.path);
           break;
           case "osc":
-            if (this.osc == null)
-              break;
-            
-            try {  
-              this.osc.send(this.parser.translate(request.path));
-            } catch (err) {
-              console.log(`bad osc message for ${request.path}: ${err}`);
+            this.emit('osc', request.path, delta, message);
+            if (this.osc != null && !this.emitOnly) {
+              try {  
+                this.osc.send(this.parser.translate(request.path));
+              } catch (err) {
+                console.log(`bad osc message for ${request.path}: ${err}`);
+              }
             }
           break;
+          default : break;
         } 
       }
-    } else if (this.midiOut != null) {
+    } else {
       this.emit('midi', delta, message);
-      this.midiOut.sendMessage(message);
-    } else
-      this.emit('midi', delta, message);
+      if (this.midiOut != null)
+        this.midiOut.sendMessage(message);
+    }
   }
   
   getOSC() {return this.osc;}
 }
 
+/*
+ * Module exports
+ */
+
 exports.Knot = Knot;
+exports.Filter = Filters.Filter;
+exports.FilterMap = Filters.FilterMap;
+exports.OSCParser = OSCParser.OSCParser;
+exports.MIDIParser = OSCParser.MIDIParser;
