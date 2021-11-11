@@ -100,7 +100,7 @@ exports.OSCParser = class {
       return {type: string, value: (string == 'T')};
     });
     
-    this.argParser.addRule(/(\d+[ ,.]+\d+)( +|$)/gm, function(value, float) {
+    this.argParser.addRule(/(\d+[,.]+\d+)( +|$)/gm, function(value, float) {
       return {type: 'f', value: float}
     });
     
