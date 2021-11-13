@@ -154,7 +154,7 @@ Note that a Filter object does not reflect the structure of a bind object. Bind 
 to be more pratical on writing, while Filters try to be practical on access.
 
 ### Example of a FilterMap.filterMap property
-```json
+```
 {
   "11A" : {"74" : [ *filter1*, *filter2* ] }
 }
