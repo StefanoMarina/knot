@@ -154,7 +154,11 @@ exports.Filter = class {
     // faders need to update osc path
     var result = { "type" : this.outcome.type};
     
-    let parser = new Parsers.MIDIParser();
+    
+    let parser = (this.parser === undefined)
+      ? new Parsers.MIDIParser()
+      : this.parser;
+      
     parser.setMidiMessage(midiMessage);
     parser.setValue(score);
     
@@ -271,7 +275,7 @@ exports.FilterMap = class {
   }
   
   /**
-   * parses and adds a new filter
+   * parses a bind and adds a new filter
    * @param channel midi channel (0-15) or "all"
    * @param bind a bind
    * @param disableShell do not add if filter contains shell commands
@@ -286,6 +290,14 @@ exports.FilterMap = class {
       return;
                     
     let filter = new exports.Filter(channel, bind);
+    this.addFilter(filter);
+  }
+  
+  /**
+   * adds a filter object
+   * @param filter new filter
+   */
+  addFilter(filter) {
     let status = filter.status;
     if (undefined === this.filterMap[status])
       this.filterMap[status] = {};
@@ -301,6 +313,21 @@ exports.FilterMap = class {
    */
   getMap(){return this.filterMap};
   
+  /**
+   * filterEach
+   * iterates through filters
+   * @param callback a function or lambda with 'filter' parameter
+   */
+  filterEach( callback ) {
+    let sb = Object.keys(this.filterMap);
+    sb.forEach((index) => {
+      let data1 = Object.keys(this.filterMap[index]);
+      data1.forEach( (d1) => { 
+        let filters = this.filterMap[index][d1];
+        filters.forEach( (filter) => { callback(filter); });
+      });
+    });
+  }
   
   /**
    * process a midi message
