@@ -38,21 +38,21 @@ See SYNTAX.md for binding syntax.
 
 As a standalone class, knot works pretty simply:
 
-``
+```
 const KNOT = require ('./knot.js');
 //open your OSC UDP channel
 const knot = new KNOT.Knot(/* optional oscChannel */);
-``
+```
 
 open up a configuration by loading one or more json files: 
 
-``
+```
 try {
   knot.loadConfiguration(["file1.json", "file2.json"]);
 } catch (err) {
   console.log(`Configuration error: ${err}`);
 }
-``
+```
 
 Knot may work without an osc port opened. Only the 'osc' message will be emitted then.
 
@@ -73,7 +73,8 @@ try {
 } catch (err) {
   console.log(`Configuration error: ${err}`);
 }
-``
+```
+
 ### Disable shell
 If you need extra security, add true as a 3rd parameter on loadConfiguration. this will remove
 any "shell" bind from the configuration.
@@ -85,13 +86,13 @@ try {
 } catch (err) {
   console.log(`Configuration error: ${err}`);
 }
-``
+```
 
 ## Midi stuff
 
 ### Open midi
 
-Knot use the ```setMidi(request)`` method to enable, open and listen to a midi input port:
+Knot use the ``setMidi(request)`` method to enable, open and listen to a midi input port:
 
 ``request`` can be:
 - an integer; in this case, Knot will assume it is a device id;
@@ -110,7 +111,7 @@ If midi input is instantiated by knot, it will be also opened. the special
   knot.midi.on('message', (delta, midiMessage) => {
     console.log('I want to listen to midi too!');
   });
-``
+```
 and that's it, knot will start converting and sending osc.
 
 ### Midi out
@@ -142,7 +143,7 @@ Any weird thing you want to do the bindings, you can get the ``filterMap`` prope
   //merges 2 filtermaps
   let mergedMap = KNOT.FilterMap.merge(filterMap, myMap);
 
-``
+```
 
 A filterMap is a multi layer object. status byte binds are turned into properties,
 with the special "11A" and "8A" for CC and noteon on "all" channels respectively.
@@ -157,7 +158,7 @@ to be more pratical on writing, while Filters try to be practical on access.
 {
   "11A" : {"74" : [ *filter1*, *filter2* ] }
 }
-``
+```
 ## Events
 
 if you use Knot ``midiCallback`` to process filters, the following events will be emitted:
@@ -185,7 +186,7 @@ let result = myParser.translate("/myosc 'string' 2 3.0 T");
 console.log(result);
 let manyResults = myParser.translateLines(["/panic", "/load 'myfile.file'"]);
 
-``
+```
 
 see SYNTAX.md for more information on OSC syntax for KNOT.
 
@@ -201,5 +202,5 @@ myMidiParser.addRule(/*add your own rule*/);
 //This iterates through all filters
 knot.filterMap.filterEach ( (filter) => {filter.parser = myMidiParser;});
 
-``
+```
 
