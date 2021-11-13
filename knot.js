@@ -91,7 +91,7 @@ class Knot extends EventEmitter{
     
       if (this.filterMap !== undefined && this.filterMap !== null) {
         if (preserve === undefined) preserve = false;
-        this.filterMap = FilterMap.merge(this.filterMap, new Filters.FilterMap(newConfiguration, disableShell), preserve);
+        this.filterMap = Filters.FilterMap.merge(this.filterMap, new Filters.FilterMap(newConfiguration, disableShell), preserve);
       } else {
         try {
           this.filterMap = new Filters.FilterMap(newConfiguration, disableShell);
@@ -177,7 +177,7 @@ class Knot extends EventEmitter{
     
     //console.log(`filtered ${JSON.stringify(message)} : ${JSON.stringify(outcome)}`);
     
-    if (outcome !== false && outcome!== undefined) {
+    if (outcome !== false && outcome !== undefined) {
       
       let request = null;
       
