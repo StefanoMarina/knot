@@ -131,5 +131,19 @@ if (verbose >= 0) {
     console.log(`Filtered ${JSON.stringify(msg)}: ${JSON.stringify(outcome)}`);
   });
   
+  if (app.osc == null) {
+    app.knot.on('osc', (osc) => {
+      if (!Array.isArray(osc))
+        osc = [osc];
+        
+      let parser = new KNOT.OSCParser();
+      try {
+        let result = parser.translateLines(osc);
+        console.log(`OSC: ${JSON.stringify(result)}`);
+      } catch (err) {
+        console.log(err);
+      }
+    })
+  }
   console.log(app.knot.filterMap.toString());
 }
