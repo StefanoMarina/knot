@@ -93,7 +93,7 @@ exports.OSCParser = class {
     //Argument parser
     this.argParser = new SimpleTextParser.Parser();
     
-    this.argParser.addRule(/[\"\']([^\"\']+)[\"\'] ( +|$)/gmi, function(full, string) {
+    this.argParser.addRule(/[\"\']([^\"\']+)[\"\']( +|$)/gmi, function(full, string) {
       if (string.match(/^base64;/)){
         try {
           return { type : 'b',
