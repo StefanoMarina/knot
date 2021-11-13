@@ -41,7 +41,7 @@ exports.Filter = class {
    * @param bind is an object built from json configuration or null for an empty filter.
    */
   constructor(channel, bind) {
-    this.bind = bind;
+ //   this.bind = bind;
     this.status = [];
     
     if (bind == null) return;
@@ -49,39 +49,35 @@ exports.Filter = class {
     if (isNaN(channel))
       this.channel = "all";
     else
-      this.channel = channel;
+      this.channel = Number(channel);
     
     // Status byte - this is where channel matters
     
     let bStatus = 0;
       
-    if (undefined !== this.bind.cc) {
-      bStatus = 176;
+    if (undefined !== bind.cc) {
+      //11A is used as a default channel for all (176 >> 4)
+      this.status = ("all" != channel ? 175+this.channel : "11A");
       this.data1 = Number(bind.cc);
-    } else if (undefined !== this.bind.note) {
-      bStatus = 144;
+    } else if (undefined !== bind.note) {
+      this.status = ("all" != chanell ? 143+this.channel : "9A");
       this.data1 = Number(bind.note);
     } else
       throw "Filter has no cc or noteon event";
     
-    if (this.channel == "all") {
-      let bMax = bStatus+16;
-        do {this.status.push(bStatus++)} while (bStatus < bMax);
-    } else
-      this.status.push(bStatus + (Number(this.channel)-1));
-    
-    // data1 byte - this is used for cc / note number
-    
     // data2 byte - this will be filtered if a fader is used instead of a trigger.
-    if (undefined !== this.bind.trigger) {
-      this.cutoff = this.bind.trigger;
+    if (undefined !== bind.trigger) {
+      this.cutoff = bind.trigger;
       this.type = "trigger";
-    } else if (undefined !== this.bind.fader) {  
+    } else if (undefined !== bind.fader) {  
       this.cutoff = 0;
-      this.type = this.bind.fader;
-    } else if (undefined !== this.bind.switch) {
+      this.type = bind.fader;
+      this.min = (bind['min'] !== undefined) ? bind['min'] : 0;
+      this.max = (bind['max'] !== undefined) ? bind['max'] : 0;
+      
+    } else if (undefined !== bind.switch) {
       this.type = "switch";
-      this.events = this.bind.switch;
+      this.events = bind.switch;
     }
     
     if (this.type != "switch") {
@@ -110,7 +106,9 @@ exports.Filter = class {
    * @return true if the midi message is accepted
    */
   accepts(midiMessage) {
-    return (this.status.indexOf(midiMessage[0]) >= 0 
+    return (  ("all" != this.channel
+                ? this.status == midiMessage[0]
+                : this.status == `${midiMessage[0] >> 4}A`)
               && (this.data1 == midiMessage[1])
               && ( (this.type == "trigger")
                     ? (midiMessage[2] == this.cutoff)
@@ -138,12 +136,12 @@ exports.Filter = class {
       case "abs" : break;
       case "int":
         score = Math.floor (
-              (score/127)*(this.bind.max-this.bind.min)+this.bind.min
+              (score/127)*(this.max-this.min)+this.min
             );
       break;
       case "float":
       score = Math.round (
-              ((score/127)*(this.bind.max-this.bind.min)+this.bind.min)
+              ((score/127)*(this.max-this.min)+this.min)
             *10) / 10;
       break;
       case "bool":
@@ -273,15 +271,14 @@ exports.FilterMap = class {
             return;
           }
           
-           filter.status.forEach( (status) => {
-              if (undefined === this.filterMap[status])
-                this.filterMap[status] = {};
-              if (this.filterMap[status][filter.data1] === undefined) {
-                this.filterMap[status][filter.data1] = [];
-              }
-              this.filterMap[status][filter.data1].push(filter);
-            });
-    
+          let status = filter.status;
+          if (undefined === this.filterMap[status])
+            this.filterMap[status] = {};
+          if (this.filterMap[status][filter.data1] === undefined) {
+            this.filterMap[status][filter.data1] = [];
+          }
+          
+          this.filterMap[status][filter.data1].push(filter);
       }, this);
     }, this);
   }
@@ -296,40 +293,53 @@ exports.FilterMap = class {
   /**
    * process a midi message
    * @param midiMessage a midi message in [Status, D1, D2] format
-   * @return an array of filtered results with { "type" , "path" } or false if no filter present
+   * @return an array of filtered results with { "type" , "path" } , which may be empty,
+   * meaning that filters are present but no event triggered, false if no filter was
+   * present.
    */
    process(midiMessage) {
-     
+      
+     let allChannels = `${midiMessage[0]>>4}A`;
      let filterList = null;
-     
+    
+     //look up for the last filter or clear it
      if (this.lastFilter != null && this.lastFilter.length > 0
             && (this.lastFilter[0].accepts(midiMessage))) {
         filterList = this.lastFilter;
       } else
         this.lastFilter = null;
             
-     if (filterList == null) {
-       if (undefined === this.filterMap[midiMessage[0]])
-        return false;
-       if (undefined === this.filterMap[midiMessage[0]][midiMessage[1]])
-        return false;
-     }     
+    //look up generic and specific filters
+    if (filterList == null) {
+      if (this.filterMap[allChannels] != null &&
+        this.filterMap[allChannels][midiMessage[1]] !== undefined) {
+        filterList = this.filterMap[allChannels][midiMessage[1]];
+      }
+      
+      if (this.filterMap[midiMessage[0]] != null &&
+          this.filterMap[midiMessage[0]][midiMessage[1]] !== undefined) {
+          filterList = (filterList == null)
+              ? this.filterMap[midiMessage[0]][midiMessage[1]]
+              : [...filterList, ...this.filterMap[midiMessage[0]][midiMessage[1]]]
+      }
+    }
+    
+    if (filterList == null)
+      return false;
+      
+    let filter = null;
+    let outcome = null;
+    let result = [];
      
-     filterList = this.filterMap[midiMessage[0]][midiMessage[1]];
+    for (let i = 0; i < filterList.length; i++) {
+      filter = filterList[i];
+       if (filter.accepts(midiMessage)){
+         this.lastFilter = filterList;
+         result.push(filter.process(midiMessage));
+       }
+    }
      
-     let filter = null;
-     let outcome = null;
-     let result = [];
-     
-     for (let i = 0; i < filterList.length; i++) {
-         filter = this.filterMap[midiMessage[0]][midiMessage[1]][i];
-         if (filter.accepts(midiMessage)){
-           this.lastFilter = filterList;
-           result.push(filter.process(midiMessage));
-         }
-     }
-     
-     return (!result.length) ? false : result;
+    return result;
    }   
    
    /**
@@ -344,12 +354,12 @@ exports.FilterMap = class {
      let type = "";
      
      for (let key in this.filterMap) {
-        status = (key >> 4);
-        channel = (key & 0xf);
+        status = isNaN(key) ? Number(key.substr(0,2)) : (key >> 4);
+        channel = isNaN(key) ? 'A' : (key & 0xf);
         type = (status == 11) ? "CC" : "note";
         
         for (let subKey in this.filterMap[key]) {
-          nKey =`CH${channel}${type}${subKey}`;  
+          nKey =`Chan ${channel}/${type}/${subKey}`;  
           result[nKey] = JSON.stringify(this.filterMap[key][subKey]);
         }
      }
@@ -362,7 +372,7 @@ exports.FilterMap = class {
     * @param source source filtermap
     * @param additional additional filtermap
     * @param preserve if true, source's filters will not be removed when they
-    * match with preserve
+    * match with additional filter (match is on data1).
     * @return new object. Note that any actual filter is referenced and not cloned
     * into the new object.
     */
@@ -370,24 +380,25 @@ exports.FilterMap = class {
       if (preserve === undefined)
         preserve = false;
       
-      //deep clone of source
       let newFilterMap = new exports.FilterMap(null, source.disableShell);
       
-      for (let sb in additional) {
-        
-        if (source[sb] !== undefined) {
-          newFilterMap[sb] = {};
-          
-          for (let d1 in additional[sb]) {
-            newFilterMap[sb][d1] = (source[sb][d1] !== undefined && preserve)
-                ? newFilterMap[sb][d1].concat(additional[sb][d1])
-                : additional[sb][d1];
-          }
-          
-        } else
-          newFilterMap[sb] = additional[sb];
-      }
+      let sMap = source.filterMap, aMap = additional.filterMap;
+      let nMap = newFilterMap.filterMap = {...sMap};
       
-      return newFilterMap;
-    }
+      let statusKeys = Object.keys(aMap);
+      
+      statusKeys.forEach( (skey)=> {
+        if (nMap[skey] === undefined) {
+          nMap[skey] = aMap[skey];
+        } else {
+          let d1Keys = Object.keys(aMap[skey]);
+          d1Keys.forEach( (d1key) => {
+            nMap[skey][d1key] = (nMap[skey][d1key] == null || !preserve)
+              ? aMap[skey][d1key]
+              : nMap[skey][d1key].concat(aMap[skey][d1key]);
+          });
+        }
+    });
+    return newFilterMap;
+  }
 }
