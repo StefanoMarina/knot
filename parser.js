@@ -278,7 +278,7 @@ class MIDIParser extends SimpleTextParser.Parser {
           result = (minus == null) ? this.value
                     : 127 - this.value;
         break;
-        default: throw "Undefined midi message '" + value+"'";
+        default: result = value;
       }
       
       return String(result);
