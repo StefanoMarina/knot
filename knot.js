@@ -91,10 +91,11 @@ class Knot extends EventEmitter{
     
       if (this.filterMap !== undefined && this.filterMap !== null) {
         if (preserve === undefined) preserve = false;
-        this.filterMap = Filters.FilterMap.merge(this.filterMap, new Filters.FilterMap(newConfiguration, disableShell), preserve);
+        this.filterMap = Filters.FilterMap.merge(this.filterMap, 
+            new Filters.FilterMap(newConfiguration, disableShell, false), preserve);
       } else {
         try {
-          this.filterMap = new Filters.FilterMap(newConfiguration, disableShell);
+          this.filterMap = new Filters.FilterMap(newConfiguration, disableShell,false);
         } catch (err) {
           throw `error in creating filter ${configuration.indexOf(cfg)}: ${err}`;
         }
