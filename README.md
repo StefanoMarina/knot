@@ -38,7 +38,7 @@ See SYNTAX.md for binding syntax.
 
 As a standalone class, knot works pretty simply:
 
-```
+```javascript
 const KNOT = require ('./knot.js');
 //open your OSC UDP channel
 const knot = new KNOT.Knot(/* optional oscChannel */);
@@ -46,7 +46,7 @@ const knot = new KNOT.Knot(/* optional oscChannel */);
 
 open up a configuration by loading one or more json files: 
 
-```
+```javascript
 try {
   knot.loadConfiguration(["file1.json", "file2.json"]);
 } catch (err) {
@@ -63,7 +63,7 @@ When you load a bind map over an existing one, conflicting binds are handled
 by discarding the original bind. With presere mode, the previous map will be kept
 in full.
 
-```
+```javascript
 try {
   //this will remove any bind found in file1.json already presentin file1_alternate.json
   knot.loadConfiguration(["file1.json", "file1_alternate.json"], false);
@@ -79,7 +79,7 @@ try {
 If you need extra security, add true as a 3rd parameter on loadConfiguration. this will remove
 any "shell" bind from the configuration.
 
-```
+```javascript
 try {
   //this will remove any  shell bind in file.json1
   knot.loadConfiguration("file1.json", false, true);
@@ -103,7 +103,7 @@ bind to the first matching ``request``;
 If midi input is instantiated by knot, it will be also opened. the special
 ``midiCallback`` method is used to process and filter bindings.
 
-```
+```javascript
   knot.setMidi("AKAI"); //bind to the first 'akai' device
   knot.setMidi(0); //bind to device #0;
   knot.setMidi(alreadyBuildInput); //reference custom midi input
@@ -124,7 +124,7 @@ not triggered.
 
 Any weird thing you want to do the bindings, you can get the ``filterMap`` property: 
 
-```
+```javascript
   const KNOT = require('./knot.js');
   const filterMap = knot.filterMap.filterMap;
 
@@ -154,7 +154,7 @@ Note that a Filter object does not reflect the structure of a bind object. Bind 
 to be more pratical on writing, while Filters try to be practical on access.
 
 ### Example of a FilterMap.filterMap property
-```
+```json
 {
   "11A" : {"74" : [ *filter1*, *filter2* ] }
 }
@@ -179,7 +179,7 @@ will not send or execute anything. To discard midi re-routing, just ``setMidiOut
 
 Knot uses SimpleTextParser to handle OSC syntax and to parse midi messages with ${} paths.
 
-```
+```javascript
 const KNOT = require('./knot.js');
 let myParser = new KNOT.OSCParser();
 let result = myParser.translate("/myosc 'string' 2 3.0 T");
@@ -194,7 +194,7 @@ MIDI Parsers are used internally, but you can use them to extend midi message sy
 MIDI Parsers are used by Filters. If ``Filter.parser`` is set, you can use a custom midi parser.
 Note that new rules should follow your own syntax, the ${} syntax is reserved.
 
-```
+```javascript
 const KNOT = require('./knot.js');
 let myMidiParser = new KNOT.MIDIParser();
 myMidiParser.addRule(/*add your own rule*/);
