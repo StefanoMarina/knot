@@ -30,7 +30,6 @@ synths and applications:
 
 There is an app.js file to be used as a process, type ``node app.js`` for more info on usage.
 
-Why "knot"? well, it's a node that binds... sorry.
 ## Use knot in your applications
 
 ### OSC
