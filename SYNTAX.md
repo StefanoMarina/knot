@@ -248,7 +248,7 @@ The "osc" property defines the osc to be triggered.
 ```json
 {
   "cc" :100,
-  "fader": abs-,
+  "fader": "abs-",
   "osc": "/filter/cutoff"
 }
 ```
@@ -263,7 +263,7 @@ if you need to put your fader score somewhere which is not the last parameter, p
 ```json
 {
   "cc" :100,
-  "fader": abs-,
+  "fader": "abs-",
   "osc": "/filter/cutoff ${val} 3"
 }
 ```
