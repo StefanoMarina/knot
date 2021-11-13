@@ -241,11 +241,13 @@ exports.FilterMap = class {
    * @param configuration should be an object wrote under the SYNTAX.md json syntax.
    * if null, an empty filter is created.
    * @param disableShell (default: false) will remove any filter with a shell command.
+   * @param disregard (default: false) just skip invalid filters
    */
-  constructor(configuration, disableShell) {
+  constructor(configuration, disableShell, disregard) {
     this.filterMap = {};
+    disregard = (disregard === undefined) ? false : disregard;
+    disableShell = (disableShell === undefined) ? false : disableShell;
     
-    if (undefined === disableShell) disableShell = false;
     this.shellDisabled = disableShell;
     
     if (configuration == null) return;
@@ -256,31 +258,41 @@ exports.FilterMap = class {
     var stString, d1String;
     
     channels.forEach ( (channel) => {
-      filterArray = configuration[channel];
-      filterArray.forEach ( (json_filter) => {
-          
-          try {
-            json_filter = exports.Filter.sanitize(json_filter);
-            
-            if (undefined !== json_filter.command && disableShell)
-              return;
-              
-            filter = new exports.Filter(channel, json_filter);
-          } catch (err) {
-            console.log(`Error with filter ${JSON.stringify(json_filter)}: ${err}. Skipping.\n`);
-            return;
-          }
-          
-          let status = filter.status;
-          if (undefined === this.filterMap[status])
-            this.filterMap[status] = {};
-          if (this.filterMap[status][filter.data1] === undefined) {
-            this.filterMap[status][filter.data1] = [];
-          }
-          
-          this.filterMap[status][filter.data1].push(filter);
-      }, this);
-    }, this);
+      let bindArray = configuration[channel];
+      bindArray.forEach ( (bind) => {
+        try {
+          this.add(channel, bind, disableShell);
+        } catch (err) {
+          if (!disregard)
+            throw err;
+        }
+      });
+    });
+  }
+  
+  /**
+   * parses and adds a new filter
+   * @param channel midi channel (0-15) or "all"
+   * @param bind a bind
+   * @param disableShell do not add if filter contains shell commands
+   * @throws if filter is not validated by sanitize
+   */
+  add(channel, bind, disableShell) {  
+    bind = exports.Filter.sanitize(bind);
+    
+    disableShell = (disableShell === undefined) ? false : disableShell;
+    
+    if (undefined !== bind.command && disableShell)
+      return;
+                    
+    let filter = new exports.Filter(channel, bind);
+    let status = filter.status;
+    if (undefined === this.filterMap[status])
+      this.filterMap[status] = {};
+    if (this.filterMap[status][filter.data1] === undefined)
+      this.filterMap[status][filter.data1] = [];
+  
+    this.filterMap[status][filter.data1].push(filter);
   }
   
   /**
