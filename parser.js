@@ -22,6 +22,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 **********************************************************************/
 
 const SimpleTextParser = require ('simple-text-parser');
+const {Buffer} = require('buffer');
 
 /**
  * TODO:
@@ -92,8 +93,16 @@ exports.OSCParser = class {
     //Argument parser
     this.argParser = new SimpleTextParser.Parser();
     
-    this.argParser.addRule(/[\"\']([^\"\']+)[\"\']/gmi, function(full, string) {
-      return { type: 's', value : string };
+    this.argParser.addRule(/[\"\']([^\"\']+)[\"\'] ( +|$)/gmi, function(full, string) {
+      if (string.match(/^base64;/)){
+        try {
+          return { type : 'b',
+             value : new Uint8Array(Buffer.from(string.substr(7), 'base64'))};
+        } catch (err) {
+          return { type: 's', value : string.substr(7) };
+        }
+      } else
+        return { type: 's', value : string };
     });
     
     this.argParser.addRule(/(^|[^\w])([TF])( +|$)/gm, function(full, before, string) {
@@ -195,6 +204,8 @@ exports.OSCParser = class {
     //translate arguments
     if (groups[2] !== undefined) {
       this.lastResult.args = this.argParser.toTree(groups[2]);
+      //clear arguments
+      this.lastResult.args.forEach (arg => { delete arg.text});
     }
     
     //build addresses
