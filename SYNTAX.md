@@ -1,14 +1,12 @@
 # JSON and OSC Syntax
 
-## Welcome to JSON
-
 JSON is a really simply human readable syntax. Simple tutorial and
 explanations can be found [here](https://www.tutorialspoint.com/json/index.htm)  
 or [here](https://www.w3schools.com/js/js_json_intro.asp).
 
-You need to grasp only the basics, such as arrays (\[ \]) and objects "\{ \}".
+You need to grasp only the basics, such as arrays (\[ \]) and objects "\{ \}". Every property key should be lower case.
 
-Every property key should be lower case.
+For an extensive reading on OSC syntax, [try here](http://wosclib.sourceforge.net/doc/_w_osc_lib_osc__spec__page.html).
 
 ## A binding file
 
@@ -127,8 +125,7 @@ actually 32 binds, 1 for each channel.
 
 #### Triggers
 Triggers require the *trigger* property, which defines the CC value or the
-velocity to be met. a trigger value of 0 means "any message". You can omit
-trigger to be automatically set on 0.
+velocity to be met.
 
 ```json
 [
@@ -136,7 +133,7 @@ trigger to be automatically set on 0.
     {
       "type": "trigger",
       "cc" : 15,
-      "trigger" : 127
+      "trigger" : 120
     },
     {
       "type": "trigger",
@@ -152,6 +149,44 @@ trigger to be automatically set on 0.
 Now the first bind triggers only when CC 15 is 127. Trigger two, on the
 other hand, will trigger everytime A5 is pressed, no matter the velocity.
 
+Triggers act when the **specific** cc value is sent: in the above example, 
+the trigger is activated only when CC 15 with value 120 is received. You can
+use *higher number mode* if you want the trigger to be used when the exact or
+higher value is received:
+
+```json
+{
+  "type" : "trigger" ,
+  "cc": 15,
+  "trigger": "^120"
+}
+```
+
+(notice that the ^ character makes the trigger a string)
+
+or 
+
+```json
+{
+  "type" : "trigger" ,
+  "cc": 15,
+  "trigger": 120,
+  "hmode" :1
+}
+```
+
+This way, the trigger will be sent if cc value 120 through 127 is sent. Value "^0" will trigger
+the event any time the event is received, no matter what:
+
+```json
+{
+  "trigger" : "^0",
+  "noteon" : 60
+}
+```
+
+This will activate the trigger everytime C4 is pressed, ignoring velocity.
+
 #### Faders
 Faders can bind midi to osc in the same way triggers do, however they pass
 a continuous value as the final OSC parameter. Supported *fader* modes are:
@@ -160,6 +195,7 @@ a continuous value as the final OSC parameter. Supported *fader* modes are:
 - *int* : integer, values will be converted to "min" and "max";
 - *float* : float, values will be converted to "min" and "max";
 - *bool* : this requires *max* only. If value is >= max, "T" will be send. if value is < max, "F" will be send.
+- *!bool*: just as bool, but if value is < max, "T" is send instead.
 
 When you do a conversion, you need two additional parameters: min and max. they define
 the boundaries of the scale. They are not required for abs.
@@ -216,8 +252,8 @@ This will turn any CC value from CC 100 to a -1 / 1 value, and then the value is
   "osc": "/distorsion"
 }
 ```
-Playing a A5 stronger than velocity 90 will enable distorsion ```/distorion T```, 
-      while playing less than 90 will disable it ```/distortion F```.
+Playing a A4 stronger than velocity 90 will enable distorsion ```/distorsion T```, 
+      while playing less than 90 will disable it with ```/distorsion F```.
 
 #### Switches
 A **Switch** is a special group of triggers bound on the same CC/Note.
@@ -319,7 +355,7 @@ All keywords support the "-" sign, so ``${-ch}`` is 15-current channel.
 | ${CH}   | Channel as in 1-16 |
 | ${sb}   | Status byte |
 | ${d1}   | Data 1 byte (CC, note  or MSB)|
-| ${d2}   | Data 2 byte (value, velocity or LSB )
+| ${d2}   | Data 2 byte (value, velocity or LSB ) |
 
 Any other code between ${} will be applied directly.
 
@@ -332,8 +368,6 @@ when played on channel 15.
 
 
 ## OSC Syntax
-
-For an extensive reading on OSC syntax, [try here](http://wosclib.sourceforge.net/doc/_w_osc_lib_osc__spec__page.html).
 
 Syntax support is pretty much depending on your software/device of choice. Knot just mindlessly sends data.
 We will cover only knot's custom parsing requirements here.

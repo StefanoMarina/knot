@@ -33,7 +33,7 @@ const Parsers = require ("./parser.js");
  * this is done through the FilterMap object initialization. custom Filter
  * handling should be considering this.
  */
-exports.Filter = class {
+class Filter {
   
   /**
    * Filter constructor
@@ -67,7 +67,9 @@ exports.Filter = class {
     
     // data2 byte - this will be filtered if a fader is used instead of a trigger.
     if (undefined !== bind.trigger) {
+      //Note: trigger cutoff should be sanitized at this point.
       this.cutoff = bind.trigger;
+      this.triggerHigherMode = bind.hmode !== undefined && bind.hmode == 1;
       this.type = "trigger";
     } else if (undefined !== bind.fader) {  
       this.cutoff = 0;
@@ -75,7 +77,7 @@ exports.Filter = class {
       this.min = (bind['min'] !== undefined) ? bind['min'] : 0;
       this.max = (bind['max'] !== undefined) ? bind['max'] : 0;
       
-    } else if (undefined !== bind.switch) {
+    } else if (undefined !== bind['switch']) {
       this.type = "switch";
       this.events = bind.switch;
     }
@@ -111,7 +113,10 @@ exports.Filter = class {
                 : this.status == `${midiMessage[0] >> 4}A`)
               && (this.data1 == midiMessage[1])
               && ( (this.type == "trigger")
-                    ? (midiMessage[2] == this.cutoff)
+                    ? ((this.triggerHigherMode)
+                        ? midiMessage[2] >= this.cutoff
+                        : midiMessage[2] == this.cutoff
+                      )
                     : true
                  )
               && ( (this.type == "switch")
@@ -147,6 +152,9 @@ exports.Filter = class {
       case "bool":
         score = (score >= this.max) ? "T" : "F";
       break;
+      case "!bool":
+        score = (score >= this.max) ? "F" : "T";
+      break;
       default:
         throw `undefined mode ${this.type}`;
     }
@@ -172,7 +180,23 @@ exports.Filter = class {
     }
     return result;
   }
-   
+  
+   /**
+  * Finds out which bind type
+  * @return type property name or null if no regular type is set
+  */
+  static getType(bind) {
+    if (bind['type'] !== undefined)
+      return (bind[bind['type']]) ? bind['type'] : null;
+    
+    for (let key in bind) {
+      if (key.match(/(fader|trigger|switch)/i))
+        return key;
+    }
+    
+    return null;
+  }
+  
   /**
    * Cleans a configuration from common errors (upper case) and
    * throws exception if configuration is invalid
@@ -198,29 +222,44 @@ exports.Filter = class {
       result.cc = Number(entry.cc);
     if (undefined !== entry.note)
       result.note = Number(entry.note);
-      
-    if (undefined === entry.trigger &&
-            undefined === entry.fader && 
-                undefined === entry.switch)
-      throw "missing trigger, fader or switch";
     
-    if (result.fader !== undefined) {
-      result.fader = result.fader.toLowerCase();
-      
-      if (result.command !== undefined)
-        throw "cannot bind a fader to a command";
-      
-      if (result.fader.indexOf("abs") == -1) {
-        if (undefined === result.max)
-          throw "missing max with fader";
-        if (undefined === result.min && "bool" != result.fader)
-          throw "missing min with fader";
-      }
-      
-      if (result.fader.match(/(int|bool|float|abs)-?/gi) == null)
-        throw "unrecognized fader " + result.fader;
-    } else if (undefined !== entry.trigger){
-      result.trigger = Number(entry.trigger);
+    let bType = Filter.getType(entry);
+    if (bType == null)
+      throw "binding type invalid or missing";
+    
+    bType = bType.toLowerCase();
+    
+    switch (bType) {
+      case 'fader': 
+        result.fader = result.fader.toLowerCase();
+        
+        if (result.command !== undefined)
+          throw "cannot bind a fader to a command";
+        
+        if (result.fader.indexOf("abs") == -1) {
+          if (undefined === result.max)
+            throw "missing max with fader";
+          if (undefined === result.min && result.fader.match(/\!?bool/) == null)
+            throw "missing min with fader";
+        }
+        
+        if (result.fader.match(/(int|\!?bool|float|abs)/gi) == null)
+          throw "unrecognized fader " + result.fader;
+      break;
+      case 'trigger':
+        if (typeof result.trigger == 'string') {
+          //expand high mode
+          result.trigger = String(entry.trigger).replaceAll(' ', '');  
+          if (result.trigger.match(/^\^?\d+$/) == null)
+            throw `invalid trigger value ${entry.trigger}`;
+          
+          if (result.trigger.includes('^')) {
+            result.hmode=1;
+            result.trigger = parseInt(result.trigger.match(/\d+/)[0]);
+          }
+        }
+      break;
+      default: break;
     }
     
     return result;
@@ -239,7 +278,7 @@ exports.Filter = class {
  * faders, in theory.
  */
 
-exports.FilterMap = class {
+class FilterMap {
 
   /**
    * @param configuration should be an object wrote under the SYNTAX.md json syntax.
@@ -441,3 +480,6 @@ exports.FilterMap = class {
     return newFilterMap;
   }
 }
+
+exports.Filter = Filter;
+exports.FilterMap = FilterMap;

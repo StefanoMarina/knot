@@ -30,7 +30,7 @@ const OSCParser = require ('./parser.js');
 const KNOT = require('./knot.js');
 
 function printHelp() {
-  console.log('node knot.js [device] [osc url or "null" ] [-pdvl] [one or more config files]');
+  console.log('node app.js [device] [osc url or "null" ] [-pdvl] [one or more config files]');
   console.log('device: may be a number or a string, knot will try to match (see -l)');
   console.log('osc: may be null or osc url (IP:port)');
   console.log('-p: preserve previous binds on conflict (default: false)');
@@ -91,7 +91,7 @@ let verbose = (parameters.indexOf("-v")>=0);
 
 let configs = app.args.splice(2,app.args.length).filter ((item)=>{return item.match(/^[^\-].*/);});
 
-try {
+try {   
     app.knot.loadConfiguration(configs, preserve);
     if (app.knot.filterMap=== undefined
           || app.knot.filterMap.getMap().length == 0)
