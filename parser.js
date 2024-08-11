@@ -109,11 +109,13 @@ exports.OSCParser = class {
       return {type: string, value: (string == 'T')};
     });
     
-    this.argParser.addRule(/(\d+[,.]+\d+)( +|$)/gm, function(value, float) {
+    // Adding optional - for negative numbers.
+    // See bug f14f1c9 (git-bug)
+    this.argParser.addRule(/(\-?\d+[,.]+\d+)( +|$)/gm, function(value, float) {
       return {type: 'f', value: float}
     });
     
-    this.argParser.addRule(/(\d+)( +|$)/gm, function(value, number) {
+    this.argParser.addRule(/(\-?\d+)( +|$)/gm, function(value, number) {
       return {type: 'i', value: parseInt(number)}
     });
   }
