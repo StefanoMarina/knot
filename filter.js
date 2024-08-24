@@ -355,7 +355,8 @@ class FilterMap {
   /**
    * filterEach
    * iterates through filters
-   * @param callback a function or lambda with 'filter' parameter
+   * @param callback a function or lambda with 'filter', 'index' and 'd1'
+   *   parameters
    */
   filterEach( callback ) {
     let sb = Object.keys(this.filterMap);
@@ -363,7 +364,7 @@ class FilterMap {
       let data1 = Object.keys(this.filterMap[index]);
       data1.forEach( (d1) => { 
         let filters = this.filterMap[index][d1];
-        filters.forEach( (filter) => { callback(filter); });
+        filters.forEach( (filter) => { callback(filter, index, d1); });
       });
     });
   }
