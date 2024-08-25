@@ -15,9 +15,9 @@ A binding file is a .json file with all the binds defined in it.
 Since a binding is an array, every binding must be inside brackets:
 
 ```
-[
+{
   ... stuff ...
-]
+}
 ```
 
 ### Channel binding
@@ -26,17 +26,17 @@ Bindings are defined by channel first. A special *all* channel (lowercase!)
 can be defined to create bindings. 
 
 ```json
-[
+{
   "1" : []
-]
+}
 ```
 This is creating a binding for channel 1.
 
 ```json
-[
+{
   "all" : [],
   "1" : []
-]
+}
 ```
 
 This will create two bind lists: one for all channels, and one specific
@@ -58,7 +58,7 @@ There are 3 tipes of bindings:
 Every bind file should be inside a JSON object. Binding type is defined as such:
 
 ```json
-[
+{
   "all" :[
     {
       "type": "trigger"
@@ -70,7 +70,7 @@ Every bind file should be inside a JSON object. Binding type is defined as such:
   "1" : [
       "type" : "fader"
   ]
-]
+}
 ```
 
 **Note**: type can be omitted. each of the 3 types requires a specific parameter
@@ -85,7 +85,7 @@ As of 0.1 two events are supported: CC and noteon. CC are filtered by their
 value, while noteon can be filtered by note pitch (data1) and velocity (data2).
 
 ```json
-[
+{
   "all" :[
     {
       "type": "trigger",
@@ -99,14 +99,14 @@ value, while noteon can be filtered by note pitch (data1) and velocity (data2).
   "1" : [
       "type" : "fader"
   ]
-]
+}
 ```
 
 We now have two binds: CC 15 and A5 (noteon 69) on all channels. This is
 actually 32 binds, 1 for each channel.
 
 ```json
-[
+{
   "all" :[
     {
       "type": "trigger",
@@ -120,7 +120,7 @@ actually 32 binds, 1 for each channel.
   "1" : [
       "type" : "fader"
   ]
-]
+}
 ```
 
 #### Triggers
@@ -128,7 +128,7 @@ Triggers require the *trigger* property, which defines the CC value or the
 velocity to be met.
 
 ```json
-[
+{
   "all" :[
     {
       "type": "trigger",
@@ -143,7 +143,7 @@ velocity to be met.
   "1" : [
       "type" : "fader"
   ]
-]
+}
 ```
 
 Now the first bind triggers only when CC 15 is 127. Trigger two, on the
