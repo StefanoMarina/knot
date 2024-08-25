@@ -52,7 +52,7 @@ You can bind either a key or a CC to a binding.
 There are 3 tipes of bindings: 
 - **Triggers** will generate the osc command when CC value/note velocity is met exactly;
 - **Faders** will generate the osc command while appending the CC/velocity value;
-- **Selectors** are similar to triggers but they have multiple values/velocity to be bound.
+- **Switches** will generate different OSC according to CC value/notes.
 
 
 Every bind file should be inside a JSON object. Binding type is defined as such:
@@ -206,7 +206,7 @@ produce a conversion on a reversed value (value = 127 - value). If ``${val}`` is
 will automatically append it on a fader.
 
 ```json
-[
+{
   "all" :[
     {
       "type": "trigger",
@@ -225,7 +225,7 @@ will automatically append it on a fader.
       "min" : "1",
       "max" : "64"
   ]
-]
+}
 ```
 
 This will capture any CC 16 event, reduce the value from 1-127 (original midi)
