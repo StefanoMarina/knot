@@ -88,6 +88,8 @@ class Filter {
         }
       }
       
+      //check if reverse mode is requested - this is created on ::sanitize
+      this.revmode = (bind.revmode !== undefined) ? bind.revmode : false; 
     } else if (undefined !== bind['switch']) {
       this.type = "switch";
       this.events = bind.switch;
@@ -143,7 +145,7 @@ class Filter {
    * @return the outcome
    */
   process(midiMessage) {
-    var score = midiMessage[2], revScore = 127 - midiMessage[2];
+    var score = (this.revmode) ? midiMessage[2] : 127 - midiMessage[2];
     
     switch (this.type) {
       case "trigger": return this.outcome;
@@ -238,6 +240,11 @@ class Filter {
     switch (bType) {
       case 'fader': 
         result.fader = result.fader.toLowerCase();
+        
+        if (result.fader.endsWith('-')) {
+          result.revmode = true;
+          result.fader = result.fader.slice(0,-1);
+        }
         
         if (result.command !== undefined)
           throw "cannot bind a fader to a command";
