@@ -77,6 +77,17 @@ class Filter {
       this.min = (bind['min'] !== undefined) ? bind['min'] : 0;
       this.max = (bind['max'] !== undefined) ? bind['max'] : 0;
       
+       //Create static conversion unit
+      if (this.max != 0 || this.min != 0) {
+       if (bind.fader == 'float') {
+          this.step = Math.round (
+            (this.max-this.min) / 1.27) / 100;
+        } else if ( bind.fader == 'int') {
+          this.step = Math.round (
+            (this.max-this.min) / 127);
+        }
+      }
+      
     } else if (undefined !== bind['switch']) {
       this.type = "switch";
       this.events = bind.switch;
@@ -139,15 +150,10 @@ class Filter {
       case "switch": 
         return {type: "osc", path: this.events[score]};
       case "abs" : break;
-      case "int":
-        score = Math.floor (
-              (score/127)*(this.max-this.min)+this.min
-            );
+      case "int": score = Math.floor ((this.step*score)+this.min);
       break;
       case "float":
-      score = Math.round (
-              ((score/127)*(this.max-this.min)+this.min)
-            *10) / 10;
+      score = Math.round(((this.step * score) + this.min) *100) / 100;
       break;
       case "bool":
         score = (score >= this.max) ? "T" : "F";
@@ -243,6 +249,13 @@ class Filter {
             throw "missing min with fader";
         }
         
+        try {
+          result.min = parseFloat(result.min);
+          result.max = parseFloat(result.max);
+        } catch (err) {
+          throw 'min/max values are NaN: ${err}';
+        }
+          
         if (result.fader.match(/(int|\!?bool|float|abs)/gi) == null)
           throw "unrecognized fader " + result.fader;
       break;
